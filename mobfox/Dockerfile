@@ -37,11 +37,13 @@ RUN mkdir -p /var/run/vars && \
         -ldflags "-X main.GitRepo=$(cat /var/run/vars/GIT_REPO) -X main.GitTag=$(cat /var/run/vars/GIT_LAST_TAG) -X main.GitCommit=$(cat /var/run/vars/GIT_HEAD_COMMIT) -X main.GitDirty=$(cat /var/run/vars/GIT_MODIFIED) -X main.BuildTime=$(cat /var/run/vars/BUILD_DATE)" \
         -o fs/haproxy-ingress-controller .
 
+
 FROM haproxytech/haproxy-alpine:2.0.8
 
-RUN apk --no-cache add socat openssl util-linux openrc htop
-
+RUN apk --no-cache add socat openssl bash util-linux openrc htop
 COPY /fs /
+COPY /mobfox /
+RUN chmod +x /start.sh
 COPY --from=builder /src/fs/haproxy-ingress-controller .
 
 ARG DUMB_INIT_SHA256=37f2c1f0372a45554f1b89924fbb134fc24c3756efaedf11e07f599494e0eff9
@@ -49,5 +51,11 @@ RUN wget --no-check-certificate -O /dumb-init https://github.com/Yelp/dumb-init/
         echo "$DUMB_INIT_SHA256  /dumb-init" | sha256sum -c - && \
         chmod +x /dumb-init && \
         chmod +x /etc/init.d/haproxy
+
+#rsyslog
+RUN apk add --no-cache rsyslog
+RUN chmod +x /action.sh
+COPY /mobfox/rsyslog.conf /etc/rsyslog.conf
+ENV TZ=UTC
 
 ENTRYPOINT ["/dumb-init", "--", "/start.sh"]
